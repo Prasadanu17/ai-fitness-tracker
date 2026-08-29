@@ -1,10 +1,11 @@
+from ai_engine.base_exercise_analyzer import BaseExerciseAnalyzer
 from ai_engine.angle_calculator import AngleCalculator
 from ai_engine.rep_counter import RepCounter
 
 
-class SquatAnalyzer:
+class SquatAnalyzer(BaseExerciseAnalyzer):
     """
-    Squat Analyzer
+    Squat Exercise Analyzer
 
     Uses MediaPipe pose landmarks.
 
@@ -13,15 +14,31 @@ class SquatAnalyzer:
         HIP -> KNEE -> ANKLE
 
     Supported sides:
-        left
-        right
+        - left
+        - right
 
     Rep cycle:
 
         UP -> DOWN -> UP
+
+    Standard result:
+
+        {
+            "exercise": "squat",
+            "side": "right",
+            "angle": 90.0,
+            "reps": 1,
+            "state": "DOWN",
+            "form": "Squat depth reached"
+        }
     """
 
-    # MediaPipe Pose landmark indexes
+    exercise_name = "squat"
+
+    # ==========================================================
+    # MEDIAPIPE POSE LANDMARK INDEXES
+    # ==========================================================
+
     LEFT_HIP = 23
     RIGHT_HIP = 24
 
@@ -31,6 +48,10 @@ class SquatAnalyzer:
     LEFT_ANKLE = 27
     RIGHT_ANKLE = 28
 
+    # ==========================================================
+    # INITIALIZATION
+    # ==========================================================
+
     def __init__(
         self,
         side="right",
@@ -39,14 +60,38 @@ class SquatAnalyzer:
         smoothing_window=3,
         min_rep_gap=3,
     ):
+        """
+        Initialize the squat analyzer.
+
+        Parameters
+        ----------
+        side : str
+            "left" or "right"
+
+        down_threshold : float
+            Knee angle at which squat depth is reached.
+
+        up_threshold : float
+            Knee angle indicating standing position.
+
+        smoothing_window : int
+            Number of angle samples used for smoothing.
+
+        min_rep_gap : int
+            Minimum frames between counted repetitions.
+        """
+
         self.side = side.lower()
 
         if self.side not in ("left", "right"):
-            raise ValueError("side must be 'left' or 'right'")
+            raise ValueError(
+                "side must be 'left' or 'right'"
+            )
 
         self.down_threshold = down_threshold
         self.up_threshold = up_threshold
 
+        # Rep counting engine
         self.rep_counter = RepCounter(
             up_threshold=up_threshold,
             down_threshold=down_threshold,
@@ -54,6 +99,7 @@ class SquatAnalyzer:
             min_rep_gap=min_rep_gap,
         )
 
+        # Current analysis state
         self.last_angle = None
         self.last_state = "UP"
         self.form_feedback = "Ready"
@@ -64,9 +110,9 @@ class SquatAnalyzer:
 
     def _get_landmarks(self, landmarks):
         """
-        Extract hip, knee and ankle landmarks for the selected side.
+        Extract hip, knee and ankle landmarks.
 
-        Accepts either:
+        Accepts:
             - list of landmarks
             - MediaPipe landmark collection
             - result.pose_landmarks[0]
@@ -76,6 +122,7 @@ class SquatAnalyzer:
             hip_index = self.RIGHT_HIP
             knee_index = self.RIGHT_KNEE
             ankle_index = self.RIGHT_ANKLE
+
         else:
             hip_index = self.LEFT_HIP
             knee_index = self.LEFT_KNEE
@@ -95,20 +142,19 @@ class SquatAnalyzer:
         """
         Analyze one frame of MediaPipe pose landmarks.
 
-        Parameters
-        ----------
-        landmarks:
-            MediaPipe pose landmarks.
-
         Returns
         -------
-        dict:
-            Squat analysis result.
+        dict
+            Standardized squat analysis result.
         """
 
+        # Get required body landmarks
         hip, knee, ankle = self._get_landmarks(landmarks)
 
-        # Calculate knee angle.
+        # ------------------------------------------------------
+        # Calculate knee angle
+        # ------------------------------------------------------
+
         angle = AngleCalculator.calculate_angle(
             hip,
             knee,
@@ -117,52 +163,60 @@ class SquatAnalyzer:
 
         self.last_angle = float(angle)
 
-        # Update repetition counter.
+        # ------------------------------------------------------
+        # Update repetition counter
+        # ------------------------------------------------------
+
         result = self.rep_counter.update(angle)
 
         self.last_state = result["state"]
 
-        # ======================================================
-        # FORM FEEDBACK
-        # ======================================================
+        # ------------------------------------------------------
+        # Form feedback
+        # ------------------------------------------------------
 
         if angle <= self.down_threshold:
-
             self.form_feedback = "Squat depth reached"
 
         elif self.last_state == "DOWN":
-
             self.form_feedback = "Drive up"
 
         elif angle >= self.up_threshold:
-
             self.form_feedback = "Standing position"
 
         else:
-
             self.form_feedback = "Moving"
 
+        # Return standardized result
         return self.get_result()
 
     # ==========================================================
-    # GET RESULT
+    # RESULT
     # ==========================================================
 
     def get_result(self):
         """
-        Return latest squat analysis result.
+        Return the latest squat analysis result.
+
+        This follows the common BaseExerciseAnalyzer
+        result structure.
         """
 
         return {
-            "exercise": "squat",
+            "exercise": self.exercise_name,
+
             "side": self.side,
+
             "angle": (
                 round(self.last_angle, 1)
                 if self.last_angle is not None
                 else 0.0
             ),
+
             "reps": self.rep_counter.get_reps(),
+
             "state": self.last_state,
+
             "form": self.form_feedback,
         }
 
@@ -171,15 +225,19 @@ class SquatAnalyzer:
     # ==========================================================
 
     def get_reps(self):
+        """Return current repetition count."""
         return self.rep_counter.get_reps()
 
     def get_state(self):
+        """Return current exercise state."""
         return self.rep_counter.get_state()
 
     def get_angle(self):
+        """Return latest knee angle."""
         return self.last_angle
 
     def get_form_feedback(self):
+        """Return current form feedback."""
         return self.form_feedback
 
     # ==========================================================
@@ -187,6 +245,10 @@ class SquatAnalyzer:
     # ==========================================================
 
     def reset(self):
+        """
+        Reset the squat analyzer to its initial state.
+        """
+
         self.rep_counter.reset()
 
         self.last_angle = None

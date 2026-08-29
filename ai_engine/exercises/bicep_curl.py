@@ -1,11 +1,32 @@
+from ai_engine.base_exercise_analyzer import BaseExerciseAnalyzer
 from ai_engine.angle_calculator import AngleCalculator
 from ai_engine.rep_counter import RepCounter
 
 
-class BicepCurlAnalyzer:
+class BicepCurlAnalyzer(BaseExerciseAnalyzer):
     """
-    Analyzes bicep curl movement using the elbow angle.
+    Bicep Curl Analyzer
+
+    Uses MediaPipe pose landmarks.
+
+    Bicep curl elbow angle:
+
+        SHOULDER -> ELBOW -> WRIST
+
+    Supported sides:
+        left
+        right
+
+    Rep cycle:
+
+        EXTENDED -> CONTRACTED -> EXTENDED
     """
+
+    exercise_name = "bicep_curl"
+
+    # ==========================================================
+    # MEDIAPIPE LANDMARK INDEXES
+    # ==========================================================
 
     RIGHT_SHOULDER = 12
     RIGHT_ELBOW = 14
@@ -15,25 +36,45 @@ class BicepCurlAnalyzer:
     LEFT_ELBOW = 13
     LEFT_WRIST = 15
 
-    def __init__(self, side="right"):
-        if side not in ("left", "right"):
+    # ==========================================================
+    # INITIALIZATION
+    # ==========================================================
+
+    def __init__(
+        self,
+        side="right",
+        down_threshold=60,
+        up_threshold=160,
+        smoothing_window=3,
+        min_rep_gap=3,
+    ):
+        self.side = side.lower()
+
+        if self.side not in ("left", "right"):
             raise ValueError("side must be 'left' or 'right'")
 
-        self.side = side
+        self.down_threshold = down_threshold
+        self.up_threshold = up_threshold
 
         self.rep_counter = RepCounter(
-            up_threshold=160,
-            down_threshold=60
+            up_threshold=up_threshold,
+            down_threshold=down_threshold,
+            smoothing_window=smoothing_window,
+            min_rep_gap=min_rep_gap,
         )
 
-        self.angle = 0.0
+        self.last_angle = None
+        self.last_state = "UP"
+        self.form_feedback = "Ready"
 
-    def analyze(self, landmarks):
+    # ==========================================================
+    # LANDMARK SELECTION
+    # ==========================================================
+
+    def _get_landmarks(self, landmarks):
         """
-        Analyze one frame of pose landmarks.
-
-        Returns:
-            dict with angle, reps, state and form status.
+        Extract shoulder, elbow and wrist landmarks
+        for the selected side.
         """
 
         if self.side == "right":
@@ -49,43 +90,113 @@ class BicepCurlAnalyzer:
         elbow = landmarks[elbow_index]
         wrist = landmarks[wrist_index]
 
-        self.angle = AngleCalculator.calculate_angle(
+        return shoulder, elbow, wrist
+
+    # ==========================================================
+    # ANALYZE
+    # ==========================================================
+
+    def analyze(self, landmarks):
+        """
+        Analyze one frame of MediaPipe pose landmarks.
+
+        Returns:
+            dict containing the current bicep curl analysis.
+        """
+
+        shoulder, elbow, wrist = self._get_landmarks(landmarks)
+
+        # Calculate elbow angle.
+        angle = AngleCalculator.calculate_angle(
             shoulder,
             elbow,
-            wrist
+            wrist,
         )
 
-        reps = self.rep_counter.update(self.angle)
-        state = self.rep_counter.get_state()
+        self.last_angle = float(angle)
 
-        return {
-            "exercise": "bicep_curl",
-            "side": self.side,
-            "angle": round(self.angle, 1),
-            "reps": reps,
-            "state": state,
-            "form": self._get_form_status()
-        }
+        # Update repetition counter.
+        result = self.rep_counter.update(angle)
+
+        self.last_state = result["state"]
+
+        # Update form feedback.
+        self.form_feedback = self._get_form_status()
+
+        return self.get_result()
+
+    # ==========================================================
+    # FORM ANALYSIS
+    # ==========================================================
 
     def _get_form_status(self):
-        if self.angle >= 160:
-            return "Arm extended"
+        """
+        Basic bicep curl movement feedback.
+        """
 
-        if self.angle <= 60:
+        if self.last_angle is None:
+            return "Ready"
+
+        if self.last_angle <= self.down_threshold:
             return "Arm contracted"
+
+        if self.last_state == "DOWN":
+            return "Lowering arm"
+
+        if self.last_angle >= self.up_threshold:
+            return "Arm extended"
 
         return "Moving"
 
+    # ==========================================================
+    # RESULT
+    # ==========================================================
+
     def get_result(self):
+        """
+        Return the latest bicep curl analysis result.
+        """
+
         return {
-            "exercise": "bicep_curl",
+            "exercise": self.exercise_name,
             "side": self.side,
-            "angle": round(self.angle, 1),
+            "angle": (
+                round(self.last_angle, 1)
+                if self.last_angle is not None
+                else 0.0
+            ),
             "reps": self.rep_counter.get_reps(),
-            "state": self.rep_counter.get_state(),
-            "form": self._get_form_status()
+            "state": self.last_state,
+            "form": self.form_feedback,
         }
 
+    # ==========================================================
+    # GETTERS
+    # ==========================================================
+
+    def get_reps(self):
+        return self.rep_counter.get_reps()
+
+    def get_state(self):
+        return self.rep_counter.get_state()
+
+    def get_angle(self):
+        return self.last_angle
+
+    def get_form_feedback(self):
+        return self.form_feedback
+
+    # ==========================================================
+    # RESET
+    # ==========================================================
+
     def reset(self):
-        self.angle = 0.0
+        """
+        Reset the analyzer to its initial state.
+        """
+
         self.rep_counter.reset()
+
+        self.last_angle = None
+        self.last_state = "UP"
+        self.form_feedback = "Ready"
