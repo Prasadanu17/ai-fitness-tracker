@@ -5,8 +5,10 @@ Central orchestration layer for the AI Fitness Tracker.
 
 Responsibilities:
     - Start a workout with a selected exercise.
+    - Start a workout in automatic detection mode.
     - Manage the active exercise analyzer.
     - Process MediaPipe pose landmarks.
+    - Automatically detect and switch exercises.
     - Return standardized workout results.
     - Reset and stop workouts safely.
 
@@ -17,17 +19,28 @@ Architecture:
         v
     WorkoutEngine
         |
-        v
-    ExerciseSelector
+        +---- Manual Mode
+        |       |
+        |       v
+        |   ExerciseSelector
         |
-        +---- SquatAnalyzer
-        |
-        +---- BicepCurlAnalyzer
-        |
-        +---- LungeAnalyzer
+        +---- Automatic Mode
+                |
+                v
+        ExerciseDetector
+                |
+                v
+        ExerciseSelector
+                |
+        +-------+-------+-------+
+        |       |       |
+        v       v       v
+      Squat   Curl    Lunge
+      Analyzer Analyzer Analyzer
 """
 
 
+from ai_engine.exercise_detector import ExerciseDetector
 from ai_engine.exercise_selector import ExerciseSelector
 
 
@@ -35,43 +48,42 @@ class WorkoutEngine:
     """
     Central controller for exercise analysis.
 
-    The WorkoutEngine does not directly import individual
-    exercise analyzers. It delegates exercise selection to
+    Supports two modes:
+
+        Manual:
+            start("squat")
+
+        Automatic:
+            start_auto()
+            process_auto(landmarks)
+
+    Individual exercise analyzers are managed through
     ExerciseSelector.
     """
 
     def __init__(self):
         self.selector = ExerciseSelector()
+        self.detector = ExerciseDetector()
 
         self.is_active = False
         self.session_id = None
 
+        # True when automatic exercise detection is enabled.
+        self.auto_detect = False
+
+        # Exercise currently detected by ExerciseDetector.
+        self.detected_exercise = None
+
     # ==========================================================
-    # START WORKOUT
+    # MANUAL START
     # ==========================================================
 
     def start(self, exercise_name, **kwargs):
         """
-        Start a workout for the selected exercise.
+        Start a manually selected workout.
 
-        Parameters
-        ----------
-        exercise_name : str
-            Exercise name, for example:
-                "squat"
-                "bicep_curl"
-                "lunge"
-
-        **kwargs
-            Configuration passed to the analyzer.
-
-            Example:
-                side="right"
-
-        Returns
-        -------
-        object
-            The selected exercise analyzer.
+        Example:
+            start("squat", side="right")
         """
 
         analyzer = self.selector.select(
@@ -80,37 +92,57 @@ class WorkoutEngine:
         )
 
         self.is_active = True
+        self.auto_detect = False
+
+        self.detected_exercise = None
 
         return analyzer
 
     # ==========================================================
-    # PROCESS FRAME
+    # AUTOMATIC START
+    # ==========================================================
+
+    def start_auto(self):
+        """
+        Start workout in automatic exercise-detection mode.
+
+        The exercise will be selected automatically when
+        pose landmarks are processed.
+        """
+
+        self.selector.clear()
+
+        self.detector.reset()
+
+        self.is_active = True
+        self.auto_detect = True
+
+        self.detected_exercise = None
+
+        return True
+
+    # ==========================================================
+    # MANUAL PROCESS
     # ==========================================================
 
     def process(self, landmarks):
         """
-        Process one frame of MediaPipe pose landmarks.
+        Process one frame using the manually selected analyzer.
 
-        Parameters
-        ----------
-        landmarks
-            MediaPipe pose landmarks.
-
-        Returns
-        -------
-        dict
-            Standardized exercise analysis result.
-
-        Raises
-        ------
-        RuntimeError
-            If no workout is currently active.
+        Raises:
+            RuntimeError if no workout is active.
         """
 
         if not self.is_active:
             raise RuntimeError(
                 "No active workout. "
                 "Call start() before process()."
+            )
+
+        if self.auto_detect:
+            raise RuntimeError(
+                "Workout is running in automatic mode. "
+                "Call process_auto() instead."
             )
 
         analyzer = self.selector.get_current_analyzer()
@@ -123,6 +155,96 @@ class WorkoutEngine:
         return analyzer.analyze(landmarks)
 
     # ==========================================================
+    # AUTOMATIC PROCESS
+    # ==========================================================
+
+    def process_auto(self, landmarks):
+        """
+        Process one frame using automatic exercise detection.
+
+        Flow:
+
+            landmarks
+                ↓
+            ExerciseDetector
+                ↓
+            detected exercise
+                ↓
+            ExerciseSelector
+                ↓
+            correct analyzer
+                ↓
+            analysis result
+        """
+
+        if not self.is_active:
+            raise RuntimeError(
+                "No active workout. "
+                "Call start_auto() before process_auto()."
+            )
+
+        if not self.auto_detect:
+            raise RuntimeError(
+                "Workout is not running in automatic mode."
+            )
+
+        # ------------------------------------------------------
+        # Detect exercise
+        # ------------------------------------------------------
+
+        detection = self.detector.detect(landmarks)
+
+        exercise = detection["exercise"]
+        confidence = detection["confidence"]
+        side = detection["side"]
+
+        # ------------------------------------------------------
+        # Nothing detected
+        # ------------------------------------------------------
+
+        if exercise is None:
+
+            return {
+                "exercise": None,
+                "confidence": confidence,
+                "side": None,
+                "status": "waiting_for_exercise",
+            }
+
+        # ------------------------------------------------------
+        # Exercise changed
+        # ------------------------------------------------------
+
+        if exercise != self.detected_exercise:
+
+            self.selector.select(
+                exercise,
+                side=side,
+            )
+
+            self.detected_exercise = exercise
+
+        # ------------------------------------------------------
+        # Analyze using selected analyzer
+        # ------------------------------------------------------
+
+        analyzer = self.selector.get_current_analyzer()
+
+        if analyzer is None:
+            raise RuntimeError(
+                "Exercise was detected but analyzer could not "
+                "be created."
+            )
+
+        result = analyzer.analyze(landmarks)
+
+        # Add automatic-detection information.
+        result["confidence"] = confidence
+        result["detection_mode"] = "automatic"
+
+        return result
+
+    # ==========================================================
     # CURRENT RESULT
     # ==========================================================
 
@@ -130,12 +252,8 @@ class WorkoutEngine:
         """
         Return the current analyzer result.
 
-        Returns
-        -------
-        dict or None
-            Current workout result.
-
-        Returns None if no workout is active.
+        Returns:
+            dict or None
         """
 
         if not self.is_active:
@@ -146,7 +264,13 @@ class WorkoutEngine:
         if analyzer is None:
             return None
 
-        return analyzer.get_result()
+        result = analyzer.get_result()
+
+        if self.auto_detect:
+            result["confidence"] = self.detector.get_confidence()
+            result["detection_mode"] = "automatic"
+
+        return result
 
     # ==========================================================
     # CURRENT EXERCISE
@@ -154,14 +278,32 @@ class WorkoutEngine:
 
     def get_current_exercise(self):
         """
-        Return the currently active exercise.
-
-        Returns
-        -------
-        str or None
+        Return the currently selected exercise.
         """
 
         return self.selector.get_current_exercise()
+
+    # ==========================================================
+    # DETECTED EXERCISE
+    # ==========================================================
+
+    def get_detected_exercise(self):
+        """
+        Return the exercise currently detected automatically.
+        """
+
+        return self.detected_exercise
+
+    # ==========================================================
+    # DETECTION CONFIDENCE
+    # ==========================================================
+
+    def get_detection_confidence(self):
+        """
+        Return the latest exercise detection confidence.
+        """
+
+        return self.detector.get_confidence()
 
     # ==========================================================
     # CURRENT ANALYZER
@@ -170,10 +312,6 @@ class WorkoutEngine:
     def get_current_analyzer(self):
         """
         Return the currently active analyzer.
-
-        Returns
-        -------
-        object or None
         """
 
         return self.selector.get_current_analyzer()
@@ -190,6 +328,17 @@ class WorkoutEngine:
         return self.selector.get_available_exercises()
 
     # ==========================================================
+    # WORKOUT MODE
+    # ==========================================================
+
+    def is_auto_mode(self):
+        """
+        Return True if automatic detection is enabled.
+        """
+
+        return self.auto_detect
+
+    # ==========================================================
     # STOP WORKOUT
     # ==========================================================
 
@@ -197,11 +346,21 @@ class WorkoutEngine:
         """
         Stop the current workout.
 
-        The selected exercise and analyzer are cleared.
+        Clears:
+            - analyzer
+            - exercise selection
+            - detector state
+            - automatic mode
         """
 
         self.selector.clear()
+
+        self.detector.reset()
+
         self.is_active = False
+        self.auto_detect = False
+
+        self.detected_exercise = None
         self.session_id = None
 
     # ==========================================================
@@ -210,11 +369,12 @@ class WorkoutEngine:
 
     def reset(self):
         """
-        Reset the current analyzer without changing
-        the selected exercise.
+        Reset the current analyzer.
 
-        Useful when the user wants to restart rep counting
-        during the same exercise.
+        The selected exercise is preserved.
+
+        In automatic mode, the currently detected exercise
+        is also preserved.
         """
 
         if not self.is_active:

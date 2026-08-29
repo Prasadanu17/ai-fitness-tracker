@@ -1,0 +1,333 @@
+"""
+Auto Workout Engine
+
+Automatically selects and manages the correct exercise analyzer
+using ExerciseDetector + DetectionStabilizer.
+
+Supported exercises:
+    - squat
+    - bicep_curl
+    - lunge
+
+Flow:
+
+    MediaPipe Landmarks
+            |
+            v
+    ExerciseDetector
+            |
+            v
+    DetectionStabilizer
+            |
+            v
+    ExerciseSelector
+            |
+            v
+    Exercise Analyzer
+"""
+
+from ai_engine.exercise_detector import ExerciseDetector
+from ai_engine.detection_stabilizer import DetectionStabilizer
+from ai_engine.exercise_selector import ExerciseSelector
+
+
+class AutoWorkoutEngine:
+    """
+    Automatic workout orchestration engine.
+
+    The user does not need to manually select an exercise.
+    The engine detects and stabilizes the exercise automatically.
+    """
+
+    def __init__(
+        self,
+        confirmation_frames=3,
+        minimum_confidence=0.60,
+    ):
+        self.detector = ExerciseDetector()
+
+        self.stabilizer = DetectionStabilizer(
+            confirmation_frames=confirmation_frames,
+            minimum_confidence=minimum_confidence,
+        )
+
+        self.selector = ExerciseSelector()
+
+        self.is_active = False
+        self.session_id = None
+
+        self.current_result = None
+
+    # ==========================================================
+    # START
+    # ==========================================================
+
+    def start(self):
+        """
+        Start automatic exercise detection.
+
+        No exercise name is required.
+        """
+
+        self.is_active = True
+
+        self.detector.reset()
+        self.stabilizer.reset()
+        self.selector.clear()
+
+        self.current_result = {
+            "exercise": None,
+            "detected_exercise": None,
+            "confidence": 0.0,
+            "side": None,
+            "status": "waiting",
+            "reps": 0,
+            "state": "UP",
+            "form": "Waiting",
+        }
+
+        return True
+
+    # ==========================================================
+    # PROCESS
+    # ==========================================================
+
+    def process(self, landmarks):
+        """
+        Process one frame of MediaPipe landmarks.
+
+        The engine automatically detects the exercise,
+        stabilizes the detection, and selects the analyzer.
+        """
+
+        if not self.is_active:
+            raise RuntimeError(
+                "No active automatic workout. "
+                "Call start() before process()."
+            )
+
+        # ------------------------------------------------------
+        # Detect exercise
+        # ------------------------------------------------------
+
+        detection = self.detector.detect(landmarks)
+
+        detected_exercise = detection.get("exercise")
+        detected_confidence = detection.get(
+            "confidence",
+            0.0,
+        )
+        detected_side = detection.get("side")
+
+        # ------------------------------------------------------
+        # Stabilize detection
+        # ------------------------------------------------------
+
+        stable = self.stabilizer.update(
+            detected_exercise,
+            detected_confidence,
+            detected_side,
+        )
+
+        stable_exercise = stable.get("exercise")
+        stable_side = stable.get("side")
+
+        # ------------------------------------------------------
+        # Waiting for an exercise
+        # ------------------------------------------------------
+
+        if stable_exercise is None:
+
+            self.current_result = {
+                "exercise": None,
+                "detected_exercise": detected_exercise,
+                "confidence": stable.get(
+                    "confidence",
+                    0.0,
+                ),
+                "side": stable_side,
+                "status": stable.get(
+                    "status",
+                    "waiting",
+                ),
+                "reps": 0,
+                "state": "UP",
+                "form": "Waiting",
+            }
+
+            return self.current_result
+
+        # ------------------------------------------------------
+        # Check current analyzer
+        # ------------------------------------------------------
+
+        current_exercise = (
+            self.selector.get_current_exercise()
+        )
+
+        # ------------------------------------------------------
+        # Automatically switch exercise
+        # ------------------------------------------------------
+
+        if current_exercise != stable_exercise:
+
+            self.selector.select(
+                stable_exercise,
+                side=stable_side or "right",
+            )
+
+        # ------------------------------------------------------
+        # Process analyzer
+        # ------------------------------------------------------
+
+        analyzer = (
+            self.selector.get_current_analyzer()
+        )
+
+        if analyzer is None:
+            raise RuntimeError(
+                "Stable exercise detected but "
+                "no analyzer is available."
+            )
+
+        analysis = analyzer.analyze(landmarks)
+
+        # ------------------------------------------------------
+        # Standardized result
+        # ------------------------------------------------------
+
+        self.current_result = {
+            "exercise": stable_exercise,
+            "detected_exercise": detected_exercise,
+            "confidence": stable.get(
+                "confidence",
+                0.0,
+            ),
+            "side": stable_side,
+
+            "status": "active",
+
+            "reps": analysis.get(
+                "reps",
+                0,
+            ),
+
+            "state": analysis.get(
+                "state",
+                "UP",
+            ),
+
+            "form": analysis.get(
+                "form",
+                "Moving",
+            ),
+
+            "angle": analysis.get(
+                "angle",
+                0.0,
+            ),
+        }
+
+        return self.current_result
+
+    # ==========================================================
+    # RESULT
+    # ==========================================================
+
+    def get_result(self):
+        """
+        Return the latest automatic workout result.
+        """
+
+        if not self.is_active:
+            return None
+
+        return self.current_result
+
+    # ==========================================================
+    # CURRENT EXERCISE
+    # ==========================================================
+
+    def get_current_exercise(self):
+        """
+        Return the currently confirmed exercise.
+        """
+
+        return self.stabilizer.get_current_exercise()
+
+    # ==========================================================
+    # CURRENT ANALYZER
+    # ==========================================================
+
+    def get_current_analyzer(self):
+        """
+        Return the active exercise analyzer.
+        """
+
+        return self.selector.get_current_analyzer()
+
+    # ==========================================================
+    # AVAILABLE EXERCISES
+    # ==========================================================
+
+    def get_available_exercises(self):
+        """
+        Return all supported exercises.
+        """
+
+        return self.selector.get_available_exercises()
+
+    # ==========================================================
+    # RESET
+    # ==========================================================
+
+    def reset(self):
+        """
+        Reset detection and the current analyzer.
+        """
+
+        if not self.is_active:
+            return
+
+        self.detector.reset()
+        self.stabilizer.reset()
+        self.selector.clear()
+
+        self.current_result = {
+            "exercise": None,
+            "detected_exercise": None,
+            "confidence": 0.0,
+            "side": None,
+            "status": "waiting",
+            "reps": 0,
+            "state": "UP",
+            "form": "Waiting",
+        }
+
+    # ==========================================================
+    # STOP
+    # ==========================================================
+
+    def stop(self):
+        """
+        Stop the automatic workout completely.
+        """
+
+        self.detector.reset()
+        self.stabilizer.reset()
+        self.selector.clear()
+
+        self.is_active = False
+        self.session_id = None
+        self.current_result = None
+
+    # ==========================================================
+    # STATUS
+    # ==========================================================
+
+    def is_running(self):
+        """
+        Return whether automatic workout is active.
+        """
+
+        return self.is_active
