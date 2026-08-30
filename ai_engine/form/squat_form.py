@@ -12,8 +12,8 @@ This is intentionally rule-based.
 Machine-learning form classification can be added later.
 """
 
-from ai_engine.angle_calculator import AngleCalculator
-from ai_engine.form_analyzer import FormAnalyzer
+from ai_engine.analysis.angle_calculator import AngleCalculator
+from ai_engine.analysis.form_analyzer import FormAnalyzer
 
 
 class SquatFormAnalyzer(FormAnalyzer):

@@ -1,7 +1,7 @@
 import cv2
 
 from ai_engine.pose_engine import PoseEngine
-from ai_engine.angle_calculator import AngleCalculator
+from ai_engine.analysis.angle_calculator import AngleCalculator
 
 
 # MediaPipe landmark indexes

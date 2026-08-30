@@ -5,15 +5,12 @@ Connects workout results to the asynchronous speech system.
 
 Responsibilities:
     - Announce workout start.
-    - Announce workout stop.
-    - Announce workout reset.
-    - Announce first exercise detection.
+    - Announce exercise detection.
     - Announce exercise changes.
     - Announce completed repetitions.
     - Announce meaningful form corrections.
     - Announce waiting state.
     - Prevent duplicate announcements.
-    - Filter low-confidence detections.
     - Reset safely.
 """
 
@@ -36,6 +33,7 @@ class VoiceController:
         speech_queue,
         min_confidence=0.70,
     ):
+
         if speech_queue is None:
             raise ValueError(
                 "speech_queue cannot be None"
@@ -47,19 +45,14 @@ class VoiceController:
             )
 
         self.queue = speech_queue
-        self.min_confidence = float(
-            min_confidence
-        )
+        self.min_confidence = min_confidence
 
-        # Current workout state
         self.current_exercise = None
         self.current_side = None
         self.current_rep = 0
 
-        # Last meaningful form feedback
         self.last_feedback = None
 
-        # Prevent repeated "waiting" announcements
         self.is_waiting_announced = False
 
     # ==========================================================
@@ -67,6 +60,7 @@ class VoiceController:
     # ==========================================================
 
     def announce_workout_started(self):
+
         event = workout_started()
 
         self.queue.put(event)
@@ -74,6 +68,7 @@ class VoiceController:
         return event
 
     def announce_workout_stopped(self):
+
         event = workout_stopped()
 
         self.queue.put(event)
@@ -81,6 +76,7 @@ class VoiceController:
         return event
 
     def announce_workout_reset(self):
+
         event = workout_reset()
 
         self.queue.put(event)
@@ -92,21 +88,11 @@ class VoiceController:
     # ==========================================================
 
     def process(self, result):
-        """
-        Process one normalized workout result.
-
-        Returns:
-            list[dict]: speech events generated for this result.
-        """
 
         if not isinstance(result, dict):
             return []
 
         events = []
-
-        # ------------------------------------------------------
-        # Read result safely
-        # ------------------------------------------------------
 
         exercise = result.get(
             "exercise"
@@ -161,16 +147,8 @@ class VoiceController:
         ):
             confidence = 0.0
 
-        confidence = max(
-            0.0,
-            min(
-                1.0,
-                confidence,
-            ),
-        )
-
         # ------------------------------------------------------
-        # Safe repetitions
+        # Safe reps
         # ------------------------------------------------------
 
         try:
@@ -196,6 +174,7 @@ class VoiceController:
             exercise is None
             and detected_exercise is None
         ):
+
             event = self._announce_waiting()
 
             if event is not None:
@@ -203,13 +182,11 @@ class VoiceController:
 
             return events
 
-        if (
-            status in {
-                "waiting",
-                "waiting_for_exercise",
-            }
-            and exercise is None
-        ):
+        if status in {
+            "waiting",
+            "waiting_for_exercise",
+        } and exercise is None:
+
             event = self._announce_waiting()
 
             if event is not None:
@@ -218,7 +195,7 @@ class VoiceController:
             return events
 
         # ======================================================
-        # CONFIDENCE FILTER
+        # CONFIDENCE
         # ======================================================
 
         if confidence < self.min_confidence:
@@ -264,19 +241,14 @@ class VoiceController:
             )
 
             self.current_side = side
-
             self.current_rep = 0
-
             self.last_feedback = None
 
         # ======================================================
         # EXERCISE CHANGE
         # ======================================================
 
-        elif (
-            active_exercise
-            != self.current_exercise
-        ):
+        elif active_exercise != self.current_exercise:
 
             event = exercise_changed(
                 active_exercise,
@@ -293,15 +265,8 @@ class VoiceController:
             )
 
             self.current_side = side
-
-            # New exercise starts from zero.
             self.current_rep = 0
-
             self.last_feedback = None
-
-        # ======================================================
-        # SAME EXERCISE
-        # ======================================================
 
         else:
 
@@ -334,10 +299,8 @@ class VoiceController:
         # FORM FEEDBACK
         # ======================================================
 
-        feedback = (
-            self._normalize_feedback(
-                form
-            )
+        feedback = self._normalize_feedback(
+            form
         )
 
         if feedback is not None:
@@ -349,7 +312,6 @@ class VoiceController:
             if event is not None:
                 events.append(event)
 
-        # We are no longer waiting.
         self.is_waiting_announced = False
 
         return events
@@ -389,7 +351,7 @@ class VoiceController:
         return message
 
     # ==========================================================
-    # FEEDBACK ANNOUNCEMENT
+    # FEEDBACK
     # ==========================================================
 
     def _announce_feedback(self, message):
@@ -408,7 +370,7 @@ class VoiceController:
         return event
 
     # ==========================================================
-    # WAITING ANNOUNCEMENT
+    # WAITING
     # ==========================================================
 
     def _announce_waiting(self):
@@ -433,7 +395,9 @@ class VoiceController:
         self.current_exercise = None
         self.current_side = None
         self.current_rep = 0
+
         self.last_feedback = None
+
         self.is_waiting_announced = False
 
     # ==========================================================

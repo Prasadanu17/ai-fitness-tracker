@@ -1,4 +1,4 @@
-from ai_engine.exercise_analyzer import ExerciseAnalyzer
+from ai_engine.exercises.exercise_analyzer import ExerciseAnalyzer
 
 
 print("ExerciseAnalyzer imported successfully")

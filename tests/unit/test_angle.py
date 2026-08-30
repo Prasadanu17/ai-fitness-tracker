@@ -1,4 +1,4 @@
-from ai_engine.angle_calculator import AngleCalculator
+from ai_engine.analysis.angle_calculator import AngleCalculator
 
 
 class Point:

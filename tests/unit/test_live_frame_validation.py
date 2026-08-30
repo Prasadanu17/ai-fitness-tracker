@@ -4,7 +4,7 @@ Live Frame Validation Test
 
 import numpy as np
 
-from ai_engine.live_auto_workout import LiveAutoWorkout
+from ai_engine.workout.live_auto_workout import LiveAutoWorkout
 
 
 print("Live Frame Validation Test")

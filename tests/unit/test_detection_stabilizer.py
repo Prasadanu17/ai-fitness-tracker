@@ -2,7 +2,7 @@
 Detection Stabilizer Test
 """
 
-from ai_engine.detection_stabilizer import DetectionStabilizer
+from ai_engine.detection.detection_stabilizer import DetectionStabilizer
 
 
 print("Detection Stabilizer Test")

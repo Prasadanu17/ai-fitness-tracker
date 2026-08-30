@@ -23,7 +23,7 @@ Pipeline under test:
 """
 
 
-from ai_engine.auto_workout_engine import AutoWorkoutEngine
+from ai_engine.workout.auto_workout_engine import AutoWorkoutEngine
 
 
 # ==========================================================

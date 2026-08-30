@@ -43,10 +43,16 @@ result = {
     "form": "Good",
 }
 
-events = controller.process(result)
+events = controller.process(
+    result
+)
 
 assert len(events) >= 1
 assert controller.get_current_exercise() == "squat"
+
+assert events[0]["type"] == (
+    "exercise_started"
+)
 
 print("Exercise detection : OK")
 print("Exercise event      :", events[0])
@@ -58,7 +64,9 @@ print("Exercise event      :", events[0])
 
 queue.clear()
 
-events = controller.process(result)
+events = controller.process(
+    result
+)
 
 assert len(events) == 0
 assert queue.is_empty()
@@ -72,10 +80,14 @@ print("Duplicate protection: OK")
 
 result["reps"] = 1
 
-events = controller.process(result)
+events = controller.process(
+    result
+)
 
 assert len(events) == 1
-assert events[0]["type"] == "rep_completed"
+assert events[0]["type"] == (
+    "rep_completed"
+)
 assert events[0]["rep"] == 1
 
 print("Rep 1 announcement  : OK")
@@ -93,7 +105,9 @@ events = controller.process(
 )
 
 assert len(events) == 1
-assert events[0]["type"] == "rep_completed"
+assert events[0]["type"] == (
+    "rep_completed"
+)
 assert events[0]["rep"] == 2
 
 print("Rep 2 announcement  : OK")
@@ -185,9 +199,17 @@ events = controller.process(
     }
 )
 
-assert controller.get_current_exercise() == "bicep_curl"
+assert controller.get_current_exercise() == (
+    "bicep_curl"
+)
+
 assert len(events) == 1
-assert events[0]["type"] == "exercise_started"
+
+# Switching exercise must produce
+# exercise_changed, NOT exercise_started.
+assert events[0]["type"] == (
+    "exercise_changed"
+)
 
 print("Exercise switching  : OK")
 
@@ -212,7 +234,12 @@ events = controller.process(
 )
 
 assert len(events) == 0
-assert controller.get_current_exercise() == "bicep_curl"
+
+# Low-confidence detection must NOT
+# change the currently active exercise.
+assert controller.get_current_exercise() == (
+    "bicep_curl"
+)
 
 print("Confidence filtering: OK")
 

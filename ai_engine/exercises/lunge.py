@@ -1,5 +1,5 @@
-from ai_engine.angle_calculator import AngleCalculator
-from ai_engine.rep_counter import RepCounter
+from ai_engine.analysis.angle_calculator import AngleCalculator
+from ai_engine.analysis.rep_counter import RepCounter
 
 
 class LungeAnalyzer:

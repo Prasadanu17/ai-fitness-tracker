@@ -13,7 +13,7 @@ Tests automatic exercise switching through:
 """
 
 
-from ai_engine.auto_workout_engine import (
+from ai_engine.workout.auto_workout_engine import (
     AutoWorkoutEngine,
 )
 

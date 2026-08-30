@@ -1,55 +1,62 @@
 """
-Live Workout Unit Test
+Live Automatic Workout Test
 """
 
-from ai_engine.workout.live_workout import LiveWorkout
+from ai_engine.workout.live_auto_workout import LiveAutoWorkout
 
 
-print("Live Workout Test")
-print("------------------")
+print("Live Automatic Workout Test")
+print("----------------------------")
 
 
 # ==========================================================
 # CREATE
 # ==========================================================
 
-live = LiveWorkout()
+workout = LiveAutoWorkout()
 
 print(
-    "Live workout created :",
-    "OK"
+    "Engine created : OK"
 )
 
 
 # ==========================================================
-# START
+# INITIAL STATE
 # ==========================================================
 
-status = live.start(
-    "squat",
-    side="right"
-)
+assert workout.running is False
 
 print(
-    "Workout started      :",
-    "OK" if live.is_running() else "FAILED"
-)
-
-print(
-    "Exercise             :",
-    status["exercise"]
+    "Initial state   : OK"
 )
 
 
 # ==========================================================
-# STATUS
+# WAITING RESULT
 # ==========================================================
 
-current_status = live.get_status()
+result = workout.process_frame(None)
+
+assert isinstance(result, dict)
+assert result["exercise"] is None
+assert result["status"] == "waiting"
 
 print(
-    "Status available     :",
-    "OK" if current_status["active"] else "FAILED"
+    "Waiting result  : OK"
+)
+
+
+# ==========================================================
+# RESULT ACCESS
+# ==========================================================
+
+current = workout.get_result()
+
+assert isinstance(current, dict)
+assert current["status"] == "waiting"
+
+print(
+    "Result access   : OK"
 )
 
 
@@ -57,23 +64,10 @@ print(
 # RESET
 # ==========================================================
 
-live.reset()
+workout.reset()
 
 print(
-    "Reset                :",
-    "OK"
-)
-
-
-# ==========================================================
-# STOP
-# ==========================================================
-
-live.stop()
-
-print(
-    "Workout stopped      :",
-    "OK" if not live.is_running() else "FAILED"
+    "Reset           : OK"
 )
 
 
@@ -81,13 +75,12 @@ print(
 # CLOSE
 # ==========================================================
 
-live.close()
+workout.close()
 
 print(
-    "Resources released   :",
-    "OK"
+    "Resources close : OK"
 )
 
 
-print("------------------")
-print("Live Workout Test PASSED")
+print("----------------------------")
+print("Live Automatic Workout Test PASSED")

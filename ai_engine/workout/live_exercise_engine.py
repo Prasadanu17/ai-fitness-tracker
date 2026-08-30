@@ -13,7 +13,7 @@ Connects:
 Supported exercises are provided by the Exercise Registry.
 """
 
-from ai_engine.exercise_selector import ExerciseSelector
+from ai_engine.registry.exercise_selector import ExerciseSelector
 
 
 class LiveExerciseEngine:

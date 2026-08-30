@@ -1,4 +1,4 @@
-from ai_engine.exercise_selector import ExerciseSelector
+from ai_engine.registry.exercise_selector import ExerciseSelector
 
 
 print("Exercise Selector Test")

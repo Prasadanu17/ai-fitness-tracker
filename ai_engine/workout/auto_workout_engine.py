@@ -26,9 +26,9 @@ Flow:
     Exercise Analyzer
 """
 
-from ai_engine.exercise_detector import ExerciseDetector
-from ai_engine.detection_stabilizer import DetectionStabilizer
-from ai_engine.exercise_selector import ExerciseSelector
+from ai_engine.detection.exercise_detector import ExerciseDetector
+from ai_engine.detection.detection_stabilizer import DetectionStabilizer
+from ai_engine.registry.exercise_selector import ExerciseSelector
 
 
 class AutoWorkoutEngine:

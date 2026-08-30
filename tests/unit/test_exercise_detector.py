@@ -2,7 +2,7 @@
 Exercise Detector Test
 """
 
-from ai_engine.exercise_detector import ExerciseDetector
+from ai_engine.detection.exercise_detector import ExerciseDetector
 
 
 def make_landmark(x, y, z=0.0, visibility=1.0):

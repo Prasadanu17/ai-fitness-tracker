@@ -15,10 +15,13 @@ from .voice_events import (
 )
 
 from .speech_queue import SpeechQueue
+from .speech_worker import SpeechWorker
+from .voice_controller import VoiceController
 
 
 __all__ = [
     "VoiceEvent",
+
     "exercise_started",
     "exercise_changed",
     "rep_completed",
@@ -27,5 +30,8 @@ __all__ = [
     "workout_started",
     "workout_stopped",
     "workout_reset",
+
     "SpeechQueue",
+    "SpeechWorker",
+    "VoiceController",
 ]

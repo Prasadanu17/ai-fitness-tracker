@@ -26,7 +26,7 @@ Controls:
 
 import cv2
 
-from ai_engine.live_workout import LiveWorkout
+from ai_engine.workout.live_workout import LiveWorkout
 
 
 # ==========================================================

@@ -15,7 +15,7 @@ into real-time workout analysis results.
 """
 
 from ai_engine.pose_engine import PoseEngine
-from ai_engine.workout_engine import WorkoutEngine
+from ai_engine.workout.workout_engine import WorkoutEngine
 
 
 class LiveWorkout:

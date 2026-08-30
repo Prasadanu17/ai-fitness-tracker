@@ -2,7 +2,7 @@
 Auto Workout Engine Test
 """
 
-from ai_engine.auto_workout_engine import AutoWorkoutEngine
+from ai_engine.workout.auto_workout_engine import AutoWorkoutEngine
 
 
 def make_landmark(x, y, z=0.0):

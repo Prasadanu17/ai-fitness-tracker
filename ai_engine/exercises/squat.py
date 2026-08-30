@@ -1,6 +1,6 @@
-from ai_engine.base_exercise_analyzer import BaseExerciseAnalyzer
-from ai_engine.angle_calculator import AngleCalculator
-from ai_engine.rep_counter import RepCounter
+from ai_engine.exercises.base_exercise_analyzer import BaseExerciseAnalyzer
+from ai_engine.analysis.angle_calculator import AngleCalculator
+from ai_engine.analysis.rep_counter import RepCounter
 
 
 class SquatAnalyzer(BaseExerciseAnalyzer):

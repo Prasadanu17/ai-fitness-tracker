@@ -17,7 +17,7 @@ Exercise Analysis
 Result
 """
 
-from ai_engine.live_exercise_engine import LiveExerciseEngine
+from ai_engine.workout.live_exercise_engine import LiveExerciseEngine
 
 
 class Landmark:

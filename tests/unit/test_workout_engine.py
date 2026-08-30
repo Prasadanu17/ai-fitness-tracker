@@ -2,7 +2,7 @@
 Workout Engine Unit Test
 """
 
-from ai_engine.workout_engine import WorkoutEngine
+from ai_engine.workout.workout_engine import WorkoutEngine
 
 
 class MockLandmark:

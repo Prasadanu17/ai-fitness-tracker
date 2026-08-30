@@ -12,7 +12,10 @@ def main():
         camera_index=0,
         model_path="models/pose_landmarker.task",
 
-        # Voice configuration
+        # ----------------------------------------------
+        # Voice
+        # ----------------------------------------------
+
         voice_enabled=True,
         voice_confidence=0.70,
         speech_rate=175,
@@ -30,15 +33,11 @@ def main():
             "\nWorkout interrupted."
         )
 
-        workout.stop()
-
     except Exception as error:
 
         print(
             f"\nWorkout error: {error}"
         )
-
-        workout.stop()
 
     finally:
 

@@ -1,4 +1,4 @@
-from ai_engine.rep_counter import RepCounter
+from ai_engine.analysis.rep_counter import RepCounter
 
 
 def main():

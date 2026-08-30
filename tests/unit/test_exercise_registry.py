@@ -1,4 +1,4 @@
-from ai_engine.exercise_registry import (
+from ai_engine.registry.exercise_registry import (
     get_available_exercises,
     get_exercise_analyzer,
     is_exercise_supported,

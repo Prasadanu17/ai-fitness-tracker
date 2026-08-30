@@ -11,7 +11,7 @@ This keeps the system modular and allows new exercises to be
 added without changing the selector itself.
 """
 
-from ai_engine.exercise_registry import (
+from ai_engine.registry.exercise_registry import (
     get_available_exercises,
     get_exercise_analyzer,
     is_exercise_supported,
