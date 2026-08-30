@@ -45,6 +45,7 @@ class SpeechWorker:
         rate=175,
         volume=1.0,
         idle_sleep=0.02,
+        debug=False,
     ):
         """
         Parameters
@@ -88,6 +89,7 @@ class SpeechWorker:
         self.rate = rate
         self.volume = volume
         self.idle_sleep = idle_sleep
+        self.debug = bool(debug)
 
         self._thread = None
         self._stop_event = threading.Event()
@@ -186,6 +188,9 @@ class SpeechWorker:
                 # ------------------------------------------------
                 # Speak event.
                 # ------------------------------------------------
+
+                if self.debug:
+                    print(f"[VOICE DEBUG] worker consumed: {message}")
 
                 self._speak(message)
 
@@ -293,9 +298,15 @@ class SpeechWorker:
 
         try:
 
+            if self.debug:
+                print(f"[VOICE DEBUG] TTS started: {message}")
+
             self._engine.say(message)
 
             self._engine.runAndWait()
+
+            if self.debug:
+                print(f"[VOICE DEBUG] TTS completed: {message}")
 
         except Exception as error:
 

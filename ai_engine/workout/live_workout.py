@@ -17,6 +17,10 @@ into real-time workout analysis results.
 from ai_engine.pose_engine import PoseEngine
 from ai_engine.workout.workout_engine import WorkoutEngine
 
+from voice_engine.speech_queue import SpeechQueue
+from voice_engine.speech_worker import SpeechWorker
+from voice_engine.voice_controller import VoiceController
+
 
 class LiveWorkout:
     """
@@ -26,12 +30,47 @@ class LiveWorkout:
     def __init__(
         self,
         model_path="models/pose_landmarker.task",
+        voice_enabled=True,
+        voice_confidence=0.70,
+        speech_rate=175,
+        speech_volume=1.0,
+        speech_queue_size=20,
+        debug=False,
     ):
         self.pose_engine = PoseEngine(
             model_path=model_path
         )
 
         self.workout_engine = WorkoutEngine()
+
+        self.voice_enabled = bool(voice_enabled)
+        self.voice_confidence = float(voice_confidence)
+        self.speech_rate = int(speech_rate)
+        self.speech_volume = float(speech_volume)
+        self.speech_queue_size = int(speech_queue_size)
+        self.debug = bool(debug)
+
+        self.speech_queue = None
+        self.speech_worker = None
+        self.voice_controller = None
+
+        if self.voice_enabled:
+            self.speech_queue = SpeechQueue(
+                max_size=self.speech_queue_size,
+            )
+
+            self.speech_worker = SpeechWorker(
+                self.speech_queue,
+                rate=self.speech_rate,
+                volume=self.speech_volume,
+                debug=self.debug,
+            )
+
+            self.voice_controller = VoiceController(
+                self.speech_queue,
+                min_confidence=self.voice_confidence,
+                debug=self.debug,
+            )
 
         self.active = False
 
@@ -51,6 +90,18 @@ class LiveWorkout:
             exercise_name,
             **kwargs
         )
+
+        if (
+            self.voice_enabled
+            and self.speech_worker is not None
+        ):
+            self.speech_worker.start()
+
+        if (
+            self.voice_enabled
+            and self.voice_controller is not None
+        ):
+            self.voice_controller.announce_workout_started()
 
         self.active = True
 
@@ -116,14 +167,25 @@ class LiveWorkout:
             landmarks
         )
 
+        result = {
+            "detected": True,
+            **analysis,
+        }
+
+        if (
+            self.voice_enabled
+            and self.voice_controller is not None
+        ):
+            try:
+                self.voice_controller.process(result)
+            except Exception as error:
+                print(f"Voice controller error: {error}")
+
         # ------------------------------------------------------
         # Add detection status
         # ------------------------------------------------------
 
-        return {
-            "detected": True,
-            **analysis,
-        }
+        return result
 
     # ==========================================================
     # STATUS
@@ -185,6 +247,21 @@ class LiveWorkout:
 
         self.workout_engine.stop()
 
+        if (
+            self.voice_enabled
+            and self.voice_controller is not None
+        ):
+            try:
+                self.voice_controller.announce_workout_stopped()
+            except Exception:
+                pass
+
+        if self.speech_worker is not None:
+            try:
+                self.speech_worker.stop()
+            except Exception:
+                pass
+
         self.active = False
 
     # ==========================================================
@@ -200,7 +277,12 @@ class LiveWorkout:
 
         self.stop()
 
-        self.pose_engine.close()
+        if self.pose_engine is not None:
+            try:
+                self.pose_engine.close()
+            except Exception:
+                pass
+            self.pose_engine = None
 
     # ==========================================================
     # IS ACTIVE

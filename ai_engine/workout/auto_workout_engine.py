@@ -44,7 +44,13 @@ class AutoWorkoutEngine:
         confirmation_frames=3,
         minimum_confidence=0.60,
     ):
-        self.detector = ExerciseDetector()
+        # Detector should report raw pose hits immediately so the
+        # stabilizer can confirm the exercise across repeated frames.
+        # This keeps the detector architecture intact while the
+        # stabilizer enforces the temporal confirmation threshold.
+        self.detector = ExerciseDetector(
+            confirmation_frames=1,
+        )
 
         self.stabilizer = DetectionStabilizer(
             confirmation_frames=confirmation_frames,

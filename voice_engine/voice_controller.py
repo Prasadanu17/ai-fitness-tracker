@@ -35,6 +35,7 @@ class VoiceController:
         self,
         speech_queue,
         min_confidence=0.70,
+        debug=False,
     ):
         if speech_queue is None:
             raise ValueError(
@@ -50,6 +51,7 @@ class VoiceController:
         self.min_confidence = float(
             min_confidence
         )
+        self.debug = bool(debug)
 
         # Current workout state
         self.current_exercise = None
@@ -324,7 +326,19 @@ class VoiceController:
                     rep_number,
                 )
 
+                if self.debug:
+                    print(
+                        f"[VOICE DEBUG] workout event: {event['type']} "
+                        f"rep={event['rep']} message={event['message']}"
+                    )
+
                 self.queue.put(event)
+
+                if self.debug:
+                    print(
+                        f"[VOICE DEBUG] controller received: {event['type']} "
+                        f"queued={event['message']}"
+                    )
 
                 events.append(event)
 

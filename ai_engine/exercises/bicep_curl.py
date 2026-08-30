@@ -43,7 +43,7 @@ class BicepCurlAnalyzer(BaseExerciseAnalyzer):
     def __init__(
         self,
         side="right",
-        down_threshold=60,
+        down_threshold=120,
         up_threshold=160,
         smoothing_window=3,
         min_rep_gap=3,

@@ -27,14 +27,27 @@ def make_landmarks():
 
 analyzer = BicepCurlAnalyzer(side="right")
 
-landmarks = make_landmarks()
+base_landmarks = make_landmarks()
+base_landmarks[12] = Point(0, 0)   # shoulder
+base_landmarks[14] = Point(1, 0)   # elbow
+base_landmarks[16] = Point(2, 0)   # wrist
 
-# Simple 90-degree arm position
-landmarks[12] = Point(0, 0)   # shoulder
-landmarks[14] = Point(1, 0)   # elbow
-landmarks[16] = Point(1, 1)   # wrist
+bent_landmarks = make_landmarks()
+bent_landmarks[12] = Point(0, 0)   # shoulder
+bent_landmarks[14] = Point(1, 0)   # elbow
+bent_landmarks[16] = Point(1, 1)   # wrist
 
-result = analyzer.analyze(landmarks)
+# Realistic extended -> curl -> extended sequence.
+for _ in range(3):
+    analyzer.analyze(base_landmarks)
+for _ in range(6):
+    analyzer.analyze(bent_landmarks)
+for _ in range(4):
+    analyzer.analyze(base_landmarks)
+
+result = analyzer.get_result()
+assert result["reps"] == 1, result
+assert result["side"] == "right", result
 
 print("Bicep Curl Analyzer Test")
 print("-------------------------")

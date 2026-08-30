@@ -9,6 +9,9 @@ directly importing individual exercise implementations.
 
 This keeps the system modular and allows new exercises to be
 added without changing the selector itself.
+
+Compatibility methods are provided for older and newer
+workout-engine components.
 """
 
 from ai_engine.registry.exercise_registry import (
@@ -31,7 +34,15 @@ class ExerciseSelector:
     result = analyzer.analyze(landmarks)
     """
 
+    # ==========================================================
+    # INITIALIZATION
+    # ==========================================================
+
     def __init__(self):
+        """
+        Initialize the selector with no active exercise.
+        """
+
         self.current_exercise = None
         self.current_analyzer = None
 
@@ -62,13 +73,21 @@ class ExerciseSelector:
             If exercise_name is not a string.
 
         ValueError
-            If the exercise is not supported.
+            If exercise_name is empty or unsupported.
         """
+
+        # ------------------------------------------------------
+        # Validate exercise name type
+        # ------------------------------------------------------
 
         if not isinstance(exercise_name, str):
             raise TypeError(
                 "exercise_name must be a string"
             )
+
+        # ------------------------------------------------------
+        # Normalize exercise name
+        # ------------------------------------------------------
 
         exercise_name = exercise_name.strip().lower()
 
@@ -76,6 +95,10 @@ class ExerciseSelector:
             raise ValueError(
                 "exercise_name cannot be empty"
             )
+
+        # ------------------------------------------------------
+        # Check registry
+        # ------------------------------------------------------
 
         if not is_exercise_supported(exercise_name):
 
@@ -88,13 +111,19 @@ class ExerciseSelector:
                 f"Available exercises: {available}"
             )
 
-        # Create analyzer through the central registry.
+        # ------------------------------------------------------
+        # Create analyzer through central registry
+        # ------------------------------------------------------
+
         analyzer = get_exercise_analyzer(
             exercise_name,
             **kwargs
         )
 
-        # Update selector state only after successful creation.
+        # ------------------------------------------------------
+        # Update state only after successful creation
+        # ------------------------------------------------------
+
         self.current_exercise = exercise_name
         self.current_analyzer = analyzer
 
@@ -117,12 +146,28 @@ class ExerciseSelector:
         return self.current_exercise
 
     # ==========================================================
+    # SELECTED EXERCISE
+    # ==========================================================
+
+    def get_selected_exercise(self):
+        """
+        Compatibility alias for get_current_exercise().
+
+        Returns
+        -------
+        str or None
+            Currently selected exercise.
+        """
+
+        return self.get_current_exercise()
+
+    # ==========================================================
     # CURRENT ANALYZER
     # ==========================================================
 
     def get_current_analyzer(self):
         """
-        Return the currently active analyzer.
+        Return the currently active exercise analyzer.
 
         Returns
         -------
@@ -131,6 +176,44 @@ class ExerciseSelector:
         """
 
         return self.current_analyzer
+
+    # ==========================================================
+    # SELECTED ANALYZER
+    # ==========================================================
+
+    def get_selected_analyzer(self):
+        """
+        Compatibility alias for get_current_analyzer().
+
+        Returns
+        -------
+        object or None
+            Active analyzer or None.
+        """
+
+        return self.get_current_analyzer()
+
+    # ==========================================================
+    # ANALYZER
+    # ==========================================================
+
+    def get_analyzer(self):
+        """
+        Compatibility alias for get_current_analyzer().
+
+        Existing workout engines may call:
+
+            selector.get_analyzer()
+
+        This keeps the selector compatible with those components.
+
+        Returns
+        -------
+        object or None
+            Currently active analyzer.
+        """
+
+        return self.get_current_analyzer()
 
     # ==========================================================
     # SELECTION STATUS
@@ -161,16 +244,17 @@ class ExerciseSelector:
         keeping the same exercise selected.
         """
 
-        if self.current_analyzer is not None:
+        if self.current_analyzer is None:
+            return
 
-            reset_method = getattr(
-                self.current_analyzer,
-                "reset",
-                None
-            )
+        reset_method = getattr(
+            self.current_analyzer,
+            "reset",
+            None,
+        )
 
-            if callable(reset_method):
-                reset_method()
+        if callable(reset_method):
+            reset_method()
 
     # ==========================================================
     # CLEAR SELECTION
