@@ -15,6 +15,10 @@ Responsibilities:
     - Prevent duplicate announcements.
     - Filter low-confidence detections.
     - Reset safely.
+
+Integration with VoiceCoach:
+    The VoiceCoach generates intelligent, contextual coaching messages
+    that are used instead of generic event messages when available.
 """
 
 from voice_engine.voice_events import (
@@ -28,6 +32,8 @@ from voice_engine.voice_events import (
     waiting_for_exercise,
 )
 
+from voice_engine.voice_coach import VoiceCoach
+
 
 class VoiceController:
 
@@ -35,6 +41,7 @@ class VoiceController:
         self,
         speech_queue,
         min_confidence=0.70,
+        voice_coach=None,
         debug=False,
     ):
         if speech_queue is None:
@@ -48,12 +55,28 @@ class VoiceController:
             )
 
         self.queue = speech_queue
+
         self.min_confidence = float(
             min_confidence
         )
+
         self.debug = bool(debug)
 
+        # ------------------------------------------------------
+        # Voice Coach
+        # ------------------------------------------------------
+
+        if voice_coach is None:
+            self.coach = VoiceCoach(
+                debug=debug
+            )
+        else:
+            self.coach = voice_coach
+
+        # ------------------------------------------------------
         # Current workout state
+        # ------------------------------------------------------
+
         self.current_exercise = None
         self.current_side = None
         self.current_rep = 0
@@ -69,6 +92,7 @@ class VoiceController:
     # ==========================================================
 
     def announce_workout_started(self):
+
         event = workout_started()
 
         self.queue.put(event)
@@ -76,6 +100,7 @@ class VoiceController:
         return event
 
     def announce_workout_stopped(self):
+
         event = workout_stopped()
 
         self.queue.put(event)
@@ -83,6 +108,7 @@ class VoiceController:
         return event
 
     def announce_workout_reset(self):
+
         event = workout_reset()
 
         self.queue.put(event)
@@ -154,13 +180,16 @@ class VoiceController:
         # ------------------------------------------------------
 
         try:
+
             confidence = float(
                 confidence
             )
+
         except (
             TypeError,
             ValueError,
         ):
+
             confidence = 0.0
 
         confidence = max(
@@ -176,13 +205,16 @@ class VoiceController:
         # ------------------------------------------------------
 
         try:
+
             reps = int(
                 reps
             )
+
         except (
             TypeError,
             ValueError,
         ):
+
             reps = 0
 
         reps = max(
@@ -198,6 +230,7 @@ class VoiceController:
             exercise is None
             and detected_exercise is None
         ):
+
             event = self._announce_waiting()
 
             if event is not None:
@@ -212,6 +245,7 @@ class VoiceController:
             }
             and exercise is None
         ):
+
             event = self._announce_waiting()
 
             if event is not None:
@@ -251,11 +285,28 @@ class VoiceController:
 
         if self.current_exercise is None:
 
+            # --------------------------------------------------
+            # Ask VoiceCoach for intelligent start message
+            # --------------------------------------------------
+
+            coached_message = (
+                self.coach.on_exercise_started(
+                    active_exercise
+                )
+            )
+
             event = exercise_started(
                 active_exercise,
                 confidence=confidence,
                 side=side,
             )
+
+            # Use coached message when available
+            if coached_message is not None:
+
+                event["message"] = (
+                    coached_message
+                )
 
             self.queue.put(event)
 
@@ -280,11 +331,28 @@ class VoiceController:
             != self.current_exercise
         ):
 
+            # --------------------------------------------------
+            # Ask VoiceCoach for transition message
+            # --------------------------------------------------
+
+            coached_message = (
+                self.coach.on_exercise_changed(
+                    active_exercise
+                )
+            )
+
             event = exercise_changed(
                 active_exercise,
                 confidence=confidence,
                 side=side,
             )
+
+            # Use coached message when available
+            if coached_message is not None:
+
+                event["message"] = (
+                    coached_message
+                )
 
             self.queue.put(event)
 
@@ -321,26 +389,74 @@ class VoiceController:
                 reps + 1,
             ):
 
+                # --------------------------------------------------
+                # IMPORTANT:
+                # Get intelligent coaching message from VoiceCoach.
+                #
+                # Previously the controller only generated:
+                #     "Rep 1"
+                #
+                # Now the actual coach is asked to generate
+                # the contextual spoken message.
+                # --------------------------------------------------
+
+                coached_message = (
+                    self.coach.on_rep_completed(
+                        active_exercise,
+                        rep_number,
+                    )
+                )
+
+                # Keep the existing event architecture.
                 event = rep_completed(
                     active_exercise,
                     rep_number,
                 )
 
-                if self.debug:
-                    print(
-                        f"[VOICE DEBUG] workout event: {event['type']} "
-                        f"rep={event['rep']} message={event['message']}"
+                # --------------------------------------------------
+                # Replace generic message with coached message
+                # when VoiceCoach provides one.
+                # --------------------------------------------------
+
+                if coached_message is not None:
+
+                    event["message"] = (
+                        coached_message
                     )
+
+                # --------------------------------------------------
+                # Debug logging
+                # --------------------------------------------------
+
+                if self.debug:
+
+                    print(
+                        f"[VOICE DEBUG] workout event: "
+                        f"{event['type']} "
+                        f"rep={event['rep']} "
+                        f"message={event['message']}"
+                    )
+
+                # --------------------------------------------------
+                # Send event to asynchronous speech queue
+                # --------------------------------------------------
 
                 self.queue.put(event)
 
                 if self.debug:
+
                     print(
-                        f"[VOICE DEBUG] controller received: {event['type']} "
+                        f"[VOICE DEBUG] controller received: "
+                        f"{event['type']} "
                         f"queued={event['message']}"
                     )
 
                 events.append(event)
+
+            # --------------------------------------------------
+            # Update controller state only after all new reps
+            # have been processed.
+            # --------------------------------------------------
 
             self.current_rep = reps
 
@@ -363,7 +479,10 @@ class VoiceController:
             if event is not None:
                 events.append(event)
 
+        # ------------------------------------------------------
         # We are no longer waiting.
+        # ------------------------------------------------------
+
         self.is_waiting_announced = False
 
         return events
@@ -411,9 +530,26 @@ class VoiceController:
         if message == self.last_feedback:
             return None
 
+        # ------------------------------------------------------
+        # Ask VoiceCoach to soften/contextualize the feedback.
+        # ------------------------------------------------------
+
+        coached_message = (
+            self.coach.on_form_feedback(
+                message
+            )
+        )
+
         event = feedback_message(
             message
         )
+
+        # Use coached message when available.
+        if coached_message is not None:
+
+            event["message"] = (
+                coached_message
+            )
 
         self.queue.put(event)
 
@@ -450,6 +586,11 @@ class VoiceController:
         self.last_feedback = None
         self.is_waiting_announced = False
 
+        # Reset VoiceCoach state too when supported.
+        if hasattr(self.coach, "reset"):
+
+            self.coach.reset()
+
     # ==========================================================
     # CLEAR
     # ==========================================================
@@ -465,13 +606,17 @@ class VoiceController:
     # ==========================================================
 
     def get_current_exercise(self):
+
         return self.current_exercise
 
     def get_current_rep(self):
+
         return self.current_rep
 
     def get_current_side(self):
+
         return self.current_side
 
     def get_last_feedback(self):
+
         return self.last_feedback
