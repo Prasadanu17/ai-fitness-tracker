@@ -566,7 +566,16 @@ class LiveAutoWorkout:
 
     def run(self):
 
-        self.start()
+        print("\n[APP] Starting AI GYM Tracker")
+        
+        try:
+            print("[APP] Initializing workout engine")
+            self.start()
+        except Exception as e:
+            print(f"[APP ERROR] Failed to start: {e}")
+            import traceback
+            traceback.print_exc()
+            return
 
         print()
         print(
@@ -636,18 +645,29 @@ class LiveAutoWorkout:
                 # AI
                 # ------------------------------------------------
 
-                result = self.process_frame(
-                    frame
-                )
+                try:
+                    result = self.process_frame(
+                        frame
+                    )
+                except Exception as e:
+                    print(f"[APP ERROR] Frame processing failed: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    result = self._waiting_result()
 
                 # ------------------------------------------------
                 # UI
                 # ------------------------------------------------
 
-                self._draw_status(
-                    frame,
-                    result,
-                )
+                try:
+                    self._draw_status(
+                        frame,
+                        result,
+                    )
+                except Exception as e:
+                    print(f"[APP ERROR] UI drawing failed: {e}")
+                    import traceback
+                    traceback.print_exc()
 
                 cv2.imshow(
                     "AI Fitness Tracker",
@@ -667,9 +687,17 @@ class LiveAutoWorkout:
 
                     self.reset()
 
+        except KeyboardInterrupt:
+            print("[APP] Interrupted by user")
+        except Exception as e:
+            print(f"[APP FATAL ERROR] {e}")
+            import traceback
+            traceback.print_exc()
         finally:
 
+            print("[APP] Cleaning up...")
             self.stop()
+            print("[APP] Application closed")
 
     # ==========================================================
     # DRAW STATUS

@@ -59,7 +59,8 @@ class ExerciseDetector:
     # ==========================================================
 
     # Bicep curl requires a clearly bent elbow.
-    BICEP_CURL_THRESHOLD = 115
+    # LOWERED THRESHOLD: More selective to prevent false positives during squat
+    BICEP_CURL_THRESHOLD = 105
 
     # Straight-arm rejection.
     BICEP_STRAIGHT_THRESHOLD = 145
@@ -67,7 +68,11 @@ class ExerciseDetector:
     # Minimum difference between arm angles.
     # Prevents both arms being equally bent from
     # immediately becoming a curl.
-    BICEP_SIDE_ADVANTAGE = 12
+    # INCREASED: Require clearer asymmetry
+    BICEP_SIDE_ADVANTAGE = 20
+
+    # Knee angle threshold: if both knees are bent, probably not a curl
+    LEG_BENT_THRESHOLD = 130
 
     # Knee angle indicating a bent leg.
     LEG_BENT_THRESHOLD = 130
@@ -125,6 +130,11 @@ class ExerciseDetector:
         self.pending_count = 0
 
         self.stable_match_count = 0
+        
+        # For debugging
+        self._last_landmarks = None
+        self._last_arm_angles = None
+        self._last_leg_angles = None
 
     # ==========================================================
     # LANDMARK VALIDATION
@@ -362,6 +372,41 @@ class ExerciseDetector:
         if angle > self.BICEP_CURL_THRESHOLD:
             return None, 0.0, None
 
+        # ========================================================
+        # CRITICAL FIX: Reject bicep curl if legs are also bent
+        # ========================================================
+        # If someone is squatting (legs bent) and their arms bend,
+        # it's NOT a bicep curl. This prevents false positives.
+        # ========================================================
+
+        right_angle, left_angle = (
+            self._get_leg_angles(landmarks)
+        )
+
+        if right_angle is not None and left_angle is not None:
+            # Both legs visible
+            right_bent = (
+                right_angle <= self.LEG_BENT_THRESHOLD
+            )
+            left_bent = (
+                left_angle <= self.LEG_BENT_THRESHOLD
+            )
+
+            # If BOTH legs are bent, this is likely a squat/lunge,
+            # NOT a bicep curl. Reject immediately.
+            if right_bent and left_bent:
+                return None, 0.0, None
+
+        # If only one leg is visible and it's bent,
+        # also reject bicep curl (safer)
+        if right_angle is not None and right_angle <= self.LEG_BENT_THRESHOLD:
+            if left_angle is None:
+                return None, 0.0, None
+
+        if left_angle is not None and left_angle <= self.LEG_BENT_THRESHOLD:
+            if right_angle is None:
+                return None, 0.0, None
+
         # If both arms are bent almost equally,
         # avoid aggressively calling it a curl.
         if len(candidates) >= 2:
@@ -592,6 +637,11 @@ class ExerciseDetector:
     # ==========================================================
 
     def _detect_raw(self, landmarks):
+
+        # Store for debugging
+        self._last_landmarks = landmarks
+        self._last_arm_angles = self._get_arm_angles(landmarks)
+        self._last_leg_angles = self._get_leg_angles(landmarks)
 
         # Bicep curl first.
         #

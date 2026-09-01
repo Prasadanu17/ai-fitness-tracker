@@ -566,7 +566,16 @@ class VoiceController:
         if self.is_waiting_announced:
             return None
 
+        # Ask VoiceCoach for a natural waiting message
+        coached_message = (
+            self.coach.on_waiting_for_exercise()
+        )
+
         event = waiting_for_exercise()
+
+        # Use coached message when available
+        if coached_message is not None:
+            event["message"] = coached_message
 
         self.queue.put(event)
 

@@ -137,6 +137,18 @@ class VoiceCoach:
     ]
 
     # ==========================================================
+    # WAITING STATE MESSAGES
+    # ==========================================================
+
+    WAITING_MESSAGES = [
+        "I'm ready when you are. Get into position.",
+        "Take your time getting ready. Let me know when you're set.",
+        "Waiting for you to begin your exercise.",
+        "Get into starting position whenever you're ready.",
+        "I'm ready to track your exercise. Let me see your full body.",
+    ]
+
+    # ==========================================================
     # INITIALIZATION
     # ==========================================================
 
@@ -343,6 +355,26 @@ class VoiceCoach:
             )
 
         return coached_message
+
+    # ==========================================================
+    # WAITING STATE
+    # ==========================================================
+
+    def on_waiting_for_exercise(self):
+        """
+        Return a patient, non-aggressive waiting message.
+        """
+
+        message = self._choose(
+            self.WAITING_MESSAGES
+        )
+
+        if self.debug:
+            print(
+                f"[VOICE COACH] waiting -> {message}"
+            )
+
+        return message
 
     # ==========================================================
     # RESET
