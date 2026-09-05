@@ -84,8 +84,8 @@ class LiveAutoWorkout:
 
             self.speech_worker = SpeechWorker(
                 self.speech_queue,
-                rate=speech_rate,
-                volume=speech_volume,
+                speech_rate=speech_rate,
+                speech_volume=speech_volume,
             )
 
             self.voice_controller = VoiceController(
